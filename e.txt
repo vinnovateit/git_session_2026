@@ -1,0 +1,148 @@
+import random
+from prettytable import PrettyTable
+
+# -----------------------------
+# Crop Knowledge Base
+# -----------------------------
+crops_data = {
+    "Rice": {
+        "pH_range": (5.5, 7.5), "water_need": "High", "yield": 2500, "profit": 20000,
+        "sustainability": 70, "climate_resilience": "Flood-resistant", "sowing": "June", "harvest": "October"
+    },
+    "Wheat": {
+        "pH_range": (6.0, 7.5), "water_need": "Medium", "yield": 2000, "profit": 18000,
+        "sustainability": 85, "climate_resilience": "Drought-tolerant", "sowing": "November", "harvest": "March"
+    },
+    "Maize": {
+        "pH_range": (5.8, 7.0), "water_need": "Medium", "yield": 2200, "profit": 21000,
+        "sustainability": 75, "climate_resilience": "Heat-tolerant", "sowing": "July", "harvest": "October"
+    },
+    "Sugarcane": {
+        "pH_range": (6.0, 8.0), "water_need": "Very High", "yield": 3400, "profit": 60000,
+        "sustainability": 65, "climate_resilience": "Flood-resistant", "sowing": "February", "harvest": "January"
+    },
+    "Millet": {
+        "pH_range": (5.0, 7.0), "water_need": "Low", "yield": 1500, "profit": 15000,
+        "sustainability": 95, "climate_resilience": "Extreme drought-tolerant", "sowing": "June", "harvest": "September"
+    },
+    "Pulses": {
+        "pH_range": (6.0, 7.5), "water_need": "Low", "yield": 1200, "profit": 16000,
+        "sustainability": 90, "climate_resilience": "Nitrogen-fixing crop", "sowing": "July", "harvest": "October"
+    }
+}
+
+# -----------------------------
+# Utility Functions
+# -----------------------------
+def normalize(value, min_val, max_val):
+    """Normalize a value between 0 and 1"""
+    return (value - min_val) / (max_val - min_val)
+
+def calculate_crop_score(crop, soil_pH, moisture, rainfall, temperature, priority):
+    """Calculate suitability score for a crop"""
+    ideal_pH_min, ideal_pH_max = crops_data[crop]["pH_range"]
+
+    # Score components
+    pH_score = 1 - abs(((ideal_pH_min + ideal_pH_max) / 2) - soil_pH) / 3
+    moisture_score = 1 - abs(0.6 - moisture)  # ideal ~0.6
+    rainfall_score = {"low": 0.5, "medium": 0.8, "high": 1.0}.get(rainfall, 0.7)
+    temp_score = 1 - abs(28 - temperature) / 20  # best around 28C
+
+    # Base score
+    base_score = (pH_score + moisture_score + rainfall_score + temp_score) / 4
+
+    # Weight adjustment based on priority
+    if priority == "profit":
+        final_score = base_score * (crops_data[crop]["profit"] / 60000)
+    elif priority == "sustainability":
+        final_score = base_score * (crops_data[crop]["sustainability"] / 100)
+    else:
+        final_score = base_score
+
+    return round(final_score, 2)
+
+def assess_risks(crop, moisture, rainfall):
+    """Generate risk assessment for each crop"""
+    risks = []
+    if crops_data[crop]["water_need"] in ["High", "Very High"] and rainfall == "low":
+        risks.append("⚠ Water scarcity risk")
+    if moisture < 0.4:
+        risks.append("⚠ Soil moisture stress")
+    if crops_data[crop]["sustainability"] < 70:
+        risks.append("⚠ Soil degradation over time")
+    if not risks:
+        risks.append("✅ Low risk")
+    return risks
+
+def give_advice(crop):
+    """Generate personalized advice"""
+    tips = [
+        f"💧 Ensure proper irrigation schedule for {crop}.",
+        f"🌾 Practice crop rotation after {crop} to restore soil fertility.",
+        f"🌱 Use organic manure to improve sustainability of {crop}.",
+        f"🛡️ Adopt integrated pest management for {crop}.",
+        f"☀️ Use mulching to retain soil moisture during {crop} cultivation."
+    ]
+    return random.choice(tips)
+
+# -----------------------------
+# Main Program
+# -----------------------------
+def main():
+    print("\n🤖 Welcome to AgroMind Pro — AI Co-Pilot for Farmers 🚜\n")
+
+    # Collect Inputs
+    soil_pH = float(input("Enter soil pH (4.5 - 8.5): "))
+    moisture = float(input("Enter soil moisture (0-1): "))
+    rainfall = input("Rainfall (low/medium/high): ").lower()
+    temperature = float(input("Enter avg temperature (°C): "))
+    farm_size = float(input("Enter farm size in acres: "))
+    priority = input("Farmer priority (profit/sustainability/balanced): ").lower()
+
+    # Process and score crops
+    results = []
+    for crop in crops_data:
+        score = calculate_crop_score(crop, soil_pH, moisture, rainfall, temperature, priority)
+        yield_est = crops_data[crop]["yield"] * farm_size * score
+        profit_est = crops_data[crop]["profit"] * farm_size * score
+        results.append({
+            "crop": crop,
+            "score": score,
+            "yield": int(yield_est),
+            "profit": int(profit_est),
+            "sustain": crops_data[crop]["sustainability"],
+            "resilience": crops_data[crop]["climate_resilience"],
+            "sowing": crops_data[crop]["sowing"],
+            "harvest": crops_data[crop]["harvest"],
+            "risks": assess_risks(crop, moisture, rainfall),
+            "advice": give_advice(crop)
+        })
+
+    # Sort by score
+    results.sort(key=lambda x: x["score"], reverse=True)
+
+    # Display Table
+    print("\n📊 Top Crop Recommendations\n")
+    table = PrettyTable(["Crop", "Score", "Yield (kg)", "Profit (₹)", "Sustainability", "Resilience"])
+    for r in results[:5]:
+        table.add_row([r["crop"], r["score"], r["yield"], r["profit"], r["sustain"], r["resilience"]])
+    print(table)
+
+    # Detailed Suggestions
+    print("\n🌟 Detailed Suggestions")
+    for r in results[:3]:
+        print(f"\n👉 {r['crop']} ({r['score']})")
+        print(f"   • Expected Yield: {r['yield']} kg on {farm_size} acres")
+        print(f"   • Profit: ₹{r['profit']}")
+        print(f"   • Sustainability: {r['sustain']}% | Resilience: {r['resilience']}")
+        print(f"   • Sowing: {r['sowing']} → Harvest: {r['harvest']}")
+        print(f"   • Risks: {', '.join(r['risks'])}")
+        print(f"   • Advice: {r['advice']}")
+
+    print("\n💡 Bonus Tip: Adopt rainwater harvesting & smart irrigation to improve long-term sustainability.\n")
+
+# -----------------------------
+# Run Program
+# -----------------------------
+if __name__ == "__main__":
+    main()
