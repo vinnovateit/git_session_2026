@@ -1,0 +1,56 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)  # allow React frontend to call this backend
+
+# Fake crop dataset (you can expand this)
+CROPS = [
+    {"crop": "Rice", "pH_range": (5.5, 7.5), "moisture": (0.6, 1.0), "yield": 2500, "profit": 20000, "sustainability": 80},
+    {"crop": "Wheat", "pH_range": (6.0, 7.5), "moisture": (0.4, 0.8), "yield": 2000, "profit": 24000, "sustainability": 100},
+    {"crop": "Sugarcane", "pH_range": (6.0, 7.5), "moisture": (0.7, 1.0), "yield": 3400, "profit": 60000, "sustainability": 70},
+    {"crop": "Maize", "pH_range": (5.5, 7.0), "moisture": (0.4, 0.7), "yield": 2200, "profit": 18000, "sustainability": 85},
+]
+
+@app.route("/recommend", methods=["POST"])
+def recommend():
+    data = request.json
+    soil_pH = data.get("soil_pH", 6.5)
+    moisture = data.get("moisture", 0.6)
+    rainfall = data.get("rainfall", "medium")
+    temperature = data.get("temperature", 28)
+    farm_size = data.get("farm_size", 2)
+    priority = data.get("priority", "balanced")
+
+    recommendations = []
+    for crop in CROPS:
+        # simple scoring function
+        ph_ok = crop["pH_range"][0] <= soil_pH <= crop["pH_range"][1]
+        moisture_ok = crop["moisture"][0] <= moisture <= crop["moisture"][1]
+        score = 0
+        if ph_ok: score += 0.5
+        if moisture_ok: score += 0.5
+
+        rec = {
+            "crop": crop["crop"],
+            "score": round(score, 2),
+            "yield": crop["yield"] * farm_size,
+            "profit": crop["profit"] * farm_size,
+            "sustainability": crop["sustainability"],
+            "risks": ["Pest risk", "Climate sensitivity"] if score < 1 else [],
+            "advice": "Ensure proper irrigation." if moisture < 0.5 else "Great conditions for growth!"
+        }
+        recommendations.append(rec)
+
+    # Sort by score & profit
+    recommendations = sorted(recommendations, key=lambda x: (-x["score"], -x["profit"]))
+
+    return jsonify({
+        "recommendations": recommendations,
+        "primary": recommendations[0]["crop"],
+        "backup": recommendations[1]["crop"] if len(recommendations) > 1 else None,
+        "sustainable": max(recommendations, key=lambda x: x["sustainability"])["crop"]
+    })
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
